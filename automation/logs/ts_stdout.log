@@ -1,0 +1,196 @@
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\_distributor_init.py:30: UserWarning: loaded more than 1 DLL from .libs:
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas.FB5AE2TYXYH2IJRDKGDGQ3XBKLKTF43H.gfortran-win_amd64.dll
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas64__v0.3.21-gcc_10_3_0.dll
+  warnings.warn("loaded more than 1 DLL from .libs:"
+2025-08-16 14:29:20.883727: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'cudart64_110.dll'; dlerror: cudart64_110.dll not found
+2025-08-16 14:29:20.939474: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+Traceback (most recent call last):
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 320, in __getattr__
+    raise AttributeError("module {!r} has no attribute "
+AttributeError: module 'numpy' has no attribute 'typeDict'
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py:511: FutureWarning: In the future `np.object` will be defined as the corresponding NumPy scalar.
+  np.object,
+Traceback (most recent call last):
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\automation\run_automation.py", line 12, in <module>
+    from spleeter.separator import Separator
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\spleeter\separator.py", line 26, in <module>
+    import tensorflow as tf
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\__init__.py", line 41, in <module>
+    from tensorflow.python.tools import module_util as _module_util
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\__init__.py", line 46, in <module>
+    from tensorflow.python import data
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\__init__.py", line 25, in <module>
+    from tensorflow.python.data import experimental
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\__init__.py", line 99, in <module>
+    from tensorflow.python.data.experimental import service
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\service\__init__.py", line 140, in <module>
+    from tensorflow.python.data.experimental.ops.data_service_ops import distribute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\data_service_ops.py", line 25, in <module>
+    from tensorflow.python.data.experimental.ops import compression_ops
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\compression_ops.py", line 20, in <module>
+    from tensorflow.python.data.util import structure
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\structure.py", line 26, in <module>
+    from tensorflow.python.data.util import nest
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\nest.py", line 40, in <module>
+    from tensorflow.python.framework import sparse_tensor as _sparse_tensor
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\sparse_tensor.py", line 28, in <module>
+    from tensorflow.python.framework import constant_op
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\constant_op.py", line 29, in <module>
+    from tensorflow.python.eager import execute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\eager\execute.py", line 27, in <module>
+    from tensorflow.python.framework import dtypes
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py", line 511, in <module>
+    np.object,
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'object'.
+`np.object` was a deprecated alias for the builtin `object`. To avoid this error in existing code, use `object` by itself. Doing this will not modify any behavior and is safe. 
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\_distributor_init.py:30: UserWarning: loaded more than 1 DLL from .libs:
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas.FB5AE2TYXYH2IJRDKGDGQ3XBKLKTF43H.gfortran-win_amd64.dll
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas64__v0.3.21-gcc_10_3_0.dll
+  warnings.warn("loaded more than 1 DLL from .libs:"
+2025-08-16 14:29:24.521426: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'cudart64_110.dll'; dlerror: cudart64_110.dll not found
+2025-08-16 14:29:24.535703: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+Traceback (most recent call last):
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 320, in __getattr__
+    raise AttributeError("module {!r} has no attribute "
+AttributeError: module 'numpy' has no attribute 'typeDict'
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py:511: FutureWarning: In the future `np.object` will be defined as the corresponding NumPy scalar.
+  np.object,
+Traceback (most recent call last):
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\automation\run_automation.py", line 12, in <module>
+    from spleeter.separator import Separator
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\spleeter\separator.py", line 26, in <module>
+    import tensorflow as tf
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\__init__.py", line 41, in <module>
+    from tensorflow.python.tools import module_util as _module_util
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\__init__.py", line 46, in <module>
+    from tensorflow.python import data
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\__init__.py", line 25, in <module>
+    from tensorflow.python.data import experimental
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\__init__.py", line 99, in <module>
+    from tensorflow.python.data.experimental import service
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\service\__init__.py", line 140, in <module>
+    from tensorflow.python.data.experimental.ops.data_service_ops import distribute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\data_service_ops.py", line 25, in <module>
+    from tensorflow.python.data.experimental.ops import compression_ops
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\compression_ops.py", line 20, in <module>
+    from tensorflow.python.data.util import structure
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\structure.py", line 26, in <module>
+    from tensorflow.python.data.util import nest
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\nest.py", line 40, in <module>
+    from tensorflow.python.framework import sparse_tensor as _sparse_tensor
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\sparse_tensor.py", line 28, in <module>
+    from tensorflow.python.framework import constant_op
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\constant_op.py", line 29, in <module>
+    from tensorflow.python.eager import execute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\eager\execute.py", line 27, in <module>
+    from tensorflow.python.framework import dtypes
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py", line 511, in <module>
+    np.object,
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'object'.
+`np.object` was a deprecated alias for the builtin `object`. To avoid this error in existing code, use `object` by itself. Doing this will not modify any behavior and is safe. 
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\_distributor_init.py:30: UserWarning: loaded more than 1 DLL from .libs:
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas.FB5AE2TYXYH2IJRDKGDGQ3XBKLKTF43H.gfortran-win_amd64.dll
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas64__v0.3.21-gcc_10_3_0.dll
+  warnings.warn("loaded more than 1 DLL from .libs:"
+2025-08-16 14:30:01.810151: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'cudart64_110.dll'; dlerror: cudart64_110.dll not found
+2025-08-16 14:30:01.821489: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+Traceback (most recent call last):
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 320, in __getattr__
+    raise AttributeError("module {!r} has no attribute "
+AttributeError: module 'numpy' has no attribute 'typeDict'
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py:511: FutureWarning: In the future `np.object` will be defined as the corresponding NumPy scalar.
+  np.object,
+Traceback (most recent call last):
+  File "automation\run_automation.py", line 12, in <module>
+    from spleeter.separator import Separator
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\spleeter\separator.py", line 26, in <module>
+    import tensorflow as tf
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\__init__.py", line 41, in <module>
+    from tensorflow.python.tools import module_util as _module_util
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\__init__.py", line 46, in <module>
+    from tensorflow.python import data
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\__init__.py", line 25, in <module>
+    from tensorflow.python.data import experimental
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\__init__.py", line 99, in <module>
+    from tensorflow.python.data.experimental import service
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\service\__init__.py", line 140, in <module>
+    from tensorflow.python.data.experimental.ops.data_service_ops import distribute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\data_service_ops.py", line 25, in <module>
+    from tensorflow.python.data.experimental.ops import compression_ops
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\compression_ops.py", line 20, in <module>
+    from tensorflow.python.data.util import structure
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\structure.py", line 26, in <module>
+    from tensorflow.python.data.util import nest
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\nest.py", line 40, in <module>
+    from tensorflow.python.framework import sparse_tensor as _sparse_tensor
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\sparse_tensor.py", line 28, in <module>
+    from tensorflow.python.framework import constant_op
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\constant_op.py", line 29, in <module>
+    from tensorflow.python.eager import execute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\eager\execute.py", line 27, in <module>
+    from tensorflow.python.framework import dtypes
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py", line 511, in <module>
+    np.object,
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'object'.
+`np.object` was a deprecated alias for the builtin `object`. To avoid this error in existing code, use `object` by itself. Doing this will not modify any behavior and is safe. 
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\_distributor_init.py:30: UserWarning: loaded more than 1 DLL from .libs:
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas.FB5AE2TYXYH2IJRDKGDGQ3XBKLKTF43H.gfortran-win_amd64.dll
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\.libs\libopenblas64__v0.3.21-gcc_10_3_0.dll
+  warnings.warn("loaded more than 1 DLL from .libs:"
+2025-08-16 14:31:21.708154: W tensorflow/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'cudart64_110.dll'; dlerror: cudart64_110.dll not found
+2025-08-16 14:31:21.708818: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+Traceback (most recent call last):
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 320, in __getattr__
+    raise AttributeError("module {!r} has no attribute "
+AttributeError: module 'numpy' has no attribute 'typeDict'
+C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py:511: FutureWarning: In the future `np.object` will be defined as the corresponding NumPy scalar.
+  np.object,
+Traceback (most recent call last):
+  File "automation\run_automation.py", line 12, in <module>
+    from spleeter.separator import Separator
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\spleeter\separator.py", line 26, in <module>
+    import tensorflow as tf
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\__init__.py", line 41, in <module>
+    from tensorflow.python.tools import module_util as _module_util
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\__init__.py", line 46, in <module>
+    from tensorflow.python import data
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\__init__.py", line 25, in <module>
+    from tensorflow.python.data import experimental
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\__init__.py", line 99, in <module>
+    from tensorflow.python.data.experimental import service
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\service\__init__.py", line 140, in <module>
+    from tensorflow.python.data.experimental.ops.data_service_ops import distribute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\data_service_ops.py", line 25, in <module>
+    from tensorflow.python.data.experimental.ops import compression_ops
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\experimental\ops\compression_ops.py", line 20, in <module>
+    from tensorflow.python.data.util import structure
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\structure.py", line 26, in <module>
+    from tensorflow.python.data.util import nest
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\data\util\nest.py", line 40, in <module>
+    from tensorflow.python.framework import sparse_tensor as _sparse_tensor
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\sparse_tensor.py", line 28, in <module>
+    from tensorflow.python.framework import constant_op
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\constant_op.py", line 29, in <module>
+    from tensorflow.python.eager import execute
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\eager\execute.py", line 27, in <module>
+    from tensorflow.python.framework import dtypes
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\tensorflow\python\framework\dtypes.py", line 511, in <module>
+    np.object,
+  File "C:\Users\shash\OneDrive\Desktop\ai_assistant_hub\tools\voca_remover\venv\lib\site-packages\numpy\__init__.py", line 305, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'object'.
+`np.object` was a deprecated alias for the builtin `object`. To avoid this error in existing code, use `object` by itself. Doing this will not modify any behavior and is safe. 
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations

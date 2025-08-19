@@ -1,0 +1,47 @@
+# Python
+_pycache_/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual envs
+venv/
+.env/
+.venv/
+env/
+
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs/temp
+*.log
+*.tmp
+
+# Local data (not for git)
+uploads/*
+pretrained_models/*
+
+# Runtime artifacts
+app.log
+latest_id.txt
+learning_data.json
+feedback_counts.json
+outputs_to_improve.json
+
+# Static outputs (keep folder)
+static/outputs/*
+!static/outputs/.gitkeep
+
+# Builds
+build/
+dist/
+
+# Docker archives
+*.tar
+
+# Node (if any)
+node_modules/

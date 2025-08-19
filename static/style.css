@@ -1,0 +1,161 @@
+/* Base Styles */
+body {
+  font-family: 'Montserrat', sans-serif;
+  background: #121212;
+  color: white;
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Upload Section */
+.upload-container {
+  background: #1e1e1e;
+  padding: 30px;
+  border-radius: 10px;
+  text-align: center;
+  margin-top: 50px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.upload-container i {
+  font-size: 48px;
+  color: #ff4d4d;
+  margin-bottom: 20px;
+}
+
+.upload-container h2 {
+  margin: 10px 0;
+  font-size: 24px;
+}
+
+.upload-container p {
+  color: #aaa;
+  margin-bottom: 20px;
+}
+
+/* File Input */
+#fileInput {
+  display: none;
+}
+
+.upload-button {
+  display: inline-block;
+  padding: 12px 24px;
+  background: #ff4d4d;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.upload-button:hover {
+  background: #ff3333;
+  transform: translateY(-2px);
+}
+
+/* Process Button */
+.process-button {
+  display: none; /* Hidden by default */
+  margin: 20px auto 0;
+  padding: 12px 24px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.process-button:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+}
+
+.process-button:disabled {
+  background: #666;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Loader */
+.loader {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.spinner {
+  border: 5px solid rgba(255, 255, 255, 0.1);
+  border-top: 5px solid #ff4d4d;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Output Section */
+.output-section {
+  display: none;
+  background: #1e1e1e;
+  padding: 30px;
+  border-radius: 10px;
+  margin-top: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.output-section h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.output-tracks {
+  display: flex;
+  gap: 20px;
+}
+
+.track {
+  flex: 1;
+  background: #2a2a2a;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.track h3 {
+  margin-top: 0;
+  color: #ff4d4d;
+}
+
+audio {
+  width: 100%;
+  margin: 15px 0;
+}
+
+.download-btn {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #ff4d4d;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.download-btn:hover {
+  background: #ff3333;
+  transform: translateY(-2px);
+}

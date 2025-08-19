@@ -1,0 +1,7 @@
+Flask==2.3.3
+Flask-Cors==4.0.0
+spleeter==2.4.0
+tensorflow==2.9.3
+ffmpeg-python==0.2.0
+norbert==0.2.1
+numpy==1.23.5

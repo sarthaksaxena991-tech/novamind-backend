@@ -1,0 +1,40 @@
+# === Which jobs to run (true/false) ===
+jobs:
+  rebuild_flags: true      # feedback -> outputs_to_improve.json
+  enhance_flagged: true    # try better stems for flagged IDs
+  prune_outputs: true      # delete very old / big folders
+  rotate_logs: true        # keep logs tidy
+  trend_adjust: true       # adapt strategy based on recent feedback
+
+# === Thresholds & safety margins ===
+thresholds:
+  negatives_to_flag: 2         # min negative feedbacks to flag an output_id
+  min_improvement_margin: 0.02 # only replace stems if score improves by this margin
+
+# === Housekeeping (retention & caps) ===
+housekeeping:
+  keep_days_outputs: 30        # delete outputs older than N days
+  max_total_outputs_gb: 8      # cap storage for static/outputs
+  max_log_files: 14            # keep last N log files
+
+# === Paths (relative to automation/ folder) ===
+paths:
+  root: ".."
+  outputs_dir: "../static/outputs"
+  feedback_file: "../learning_data.json"
+  flags_file: "../outputs_to_improve.json"
+  log_dir: "./logs"
+
+# === Enhancement settings ===
+enhance:
+  try_4stems: false        # true = also try spleeter:4stems (heavier)
+  sample_rate: 22050       # processing SR for scoring/post-FX
+  duration_limit_sec: 180  # limit separation duration (seconds)
+
+# === Trend-based strategy switches (optional smartness) ===
+trends:
+  recent_window: 200       # last N feedbacks considered "recent"
+  prefer_2stems_when:
+    neg_rate_below: 0.25   # if recent negatives/total < 25%
+  prefer_4stems_when:
+    neg_rate_above: 0.45   # if recent negatives/total > 45%

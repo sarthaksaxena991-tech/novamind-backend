@@ -1,0 +1,4 @@
+2025-08-19 10:29:35,755 | INFO | [788a12a20ef6bca96322bb97d38fdc21] base score: 0.179
+2025-08-19 10:29:39,997 | INFO | [788a12a20ef6bca96322bb97d38fdc21] scores -> baseline=0.179, mild=0.319, strong=0.121 -> pick strong-denoise
+2025-08-19 10:29:40,102 | INFO | [788a12a20ef6bca96322bb97d38fdc21] replaced stems with 'strong-denoise'
+2025-08-19 10:29:40,113 | INFO | Enhanced 1/1 outputs.
