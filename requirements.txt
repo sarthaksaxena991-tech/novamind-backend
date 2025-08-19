@@ -1,12 +1,8 @@
 flask==2.3.3
 flask-cors==4.0.0
 gunicorn==21.2.0
-
-# audio stack
 numpy==1.23.5
 librosa==0.10.1
 soundfile==0.12.1
 spleeter==2.4.0
-
-# TensorFlow CPU (compatible with py3.9 + numpy 1.23)
 tensorflow-cpu==2.10.1
