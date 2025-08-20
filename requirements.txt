@@ -1,3 +1,7 @@
 flask==2.3.3
 flask-cors==4.0.0
 gunicorn==21.2.0
+spleeter==2.4.0
+librosa==0.10.2.post1
+soundfile==0.12.1
+numpy>=1.23
