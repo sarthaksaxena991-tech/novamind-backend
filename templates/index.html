@@ -187,5 +187,38 @@
       }
     });
   </script>
+
+  <form id="vr-form" enctype="multipart/form-data">
+  <input type="file" id="audioFile" name="file" accept=".mp3,.wav" required />
+  <button type="submit">Process Audio</button>
+</form>
+<p id="msg"></p>
+<audio id="vocal" controls></audio>
+<audio id="inst" controls></audio>
+
+<script>
+  const BASE = "";
+  document.getElementById("vr-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = document.getElementById("audioFile").files[0];
+    if (!f) return show("Select a file first");
+
+    const fd = new FormData();
+    fd.append("file", f);
+
+    show("Processing...");
+    try {
+      const res = await fetch(BASE + "/process", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok || data.status !== "success") throw new Error(data.message || "Failed");
+
+      document.getElementById("vocal").src = data.vocal_path;
+      document.getElementById("inst").src  = data.instrumental_path;
+      show("Done ✅");
+    } catch (err) { show("Error: " + err.message); }
+  });
+  function show(t){ document.getElementById("msg").textContent = t; }
+</script>
+
 </body>
 </html>
