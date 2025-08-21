@@ -3,6 +3,9 @@ from collections import Counter
 from flask import Flask, jsonify, render_template, request, url_for
 from flask_cors import CORS
 
+from spleeter.separator import Separator
+SEPARATOR = Separator("spleeter:2stems")  # loads once; keeps in memory
+
 # ---------- Flask ----------
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -126,26 +129,20 @@ def process():
         # ensure WAV
         in_path = convert_to_wav_if_needed(in_path)
 
-        # --------- Run Spleeter in the separate venv (CLI) ---------
-        cmd = [
-            SPLEETER_PY, "-m", "spleeter", "separate",
-            "-p", SPLEETER_MODEL,
-            "-o", out_dir,
-            "-c", "wav",
-            in_path,
-        ]
-        logging.info("Running: %s", " ".join(cmd))
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        except FileNotFoundError:
+            SEPARATOR.separate_to_file(
+                in_path,
+                out_dir,
+                codec="wav",
+                bitrate="320k",
+                filename_format="{instrument}.wav",
+            )
+        except Exception as e:
+            logging.exception("Spleeter failed")
             return jsonify({
                 "status": "error",
-                "message": f"Spleeter python not found: {SPLEETER_PY}. Set SPLEETER_PY env var or create spleeter-env."
+                "message": f"Spleeter processing failed: {str(e)}"
             }), 500
-
-        if proc.returncode != 0:
-            logging.error(proc.stderr)
-            return jsonify({"status": "error", "message": f"Spleeter failed: {proc.stderr[:600]}"}), 500
 
         # discover outputs
         base_name = os.path.splitext(os.path.basename(in_path))[0]
@@ -222,6 +219,7 @@ def feedback():
     except Exception as e:
         logging.exception("Feedback error")
         return jsonify({"status": "error", "message": f"{type(e).__name__}: {str(e)}"}), 500
+
 if __name__ == "__main__":
     if not os.path.exists(BAD_OUTPUTS_FILE):
         with open(BAD_OUTPUTS_FILE, "w", encoding="utf-8") as f:
@@ -230,4 +228,3 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 5050))  # Render/Heroku etc. assigns PORT dynamically
     logging.info(f"Starting Flask on 0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
-
