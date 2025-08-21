@@ -10,16 +10,20 @@
     .row{display:flex;gap:12px;flex-wrap:wrap}
     button,input[type=file]{padding:10px 14px;border:0;border-radius:10px}
     button{background:#e04b4b;color:#fff;cursor:pointer}
+    button:disabled{background:#555;cursor:not-allowed}
     .muted{opacity:.75}
     #bar{height:6px;background:#2b2f3a;border-radius:8px;overflow:hidden;margin-top:14px}
     #bar>span{display:block;width:0;height:6px;background:#f0a23c;transition:width .3s}
     audio{width:100%}
+    .hidden{display:none}
+    .error{color:#ff6b6b}
+    .success{color:#4ecdc4}
   </style>
 </head>
 <body>
   <div class="card">
     <h1>VOCAL REMOVER PRO</h1>
-    <p class="muted">Choose an audio file. Click <b>Process Audio</b>.</p>
+    <p class="muted">Choose an audio file (MP3 or WAV). Click <b>Process Audio</b>.</p>
 
     <form id="frm" class="row">
       <input id="file" type="file" accept=".mp3,.wav" />
@@ -29,51 +33,137 @@
     <div id="bar"><span id="fill"></span></div>
     <p id="msg" class="muted">Idle</p>
 
-    <h3 id="outHdr" style="display:none;margin-top:18px">Result</h3>
-    <audio id="voc" controls></audio>
-    <audio id="acc" controls style="margin-top:8px"></audio>
+    <div id="results" class="hidden">
+      <h3 style="margin-top:18px">Result</h3>
+      <div>
+        <h4>Vocals</h4>
+        <audio id="voc" controls></audio>
+      </div>
+      <div style="margin-top:16px">
+        <h4>Instrumental</h4>
+        <audio id="acc" controls></audio>
+      </div>
+      <div style="margin-top:16px">
+        <button id="downloadVoc" onclick="downloadAudio('voc')">Download Vocals</button>
+        <button id="downloadAcc" onclick="downloadAudio('acc')">Download Instrumental</button>
+      </div>
+    </div>
   </div>
 
   <script>
     const frm = document.getElementById('frm');
     const file = document.getElementById('file');
+    const go = document.getElementById('go');
     const fill = document.getElementById('fill');
-    const msg  = document.getElementById('msg');
-    const voc  = document.getElementById('voc');
-    const acc  = document.getElementById('acc');
-    const outHdr = document.getElementById('outHdr');
+    const msg = document.getElementById('msg');
+    const voc = document.getElementById('voc');
+    const acc = document.getElementById('acc');
+    const results = document.getElementById('results');
+    const downloadVoc = document.getElementById('downloadVoc');
+    const downloadAcc = document.getElementById('downloadAcc');
 
-    function setStatus(t){ msg.textContent = t; }
+    let currentVocalPath = '';
+    let currentAccPath = '';
 
-    frm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      if(!file.files.length){ setStatus('Choose a file'); return; }
+    function setStatus(text, isError = false) {
+      msg.textContent = text;
+      msg.className = isError ? 'error' : 'muted';
+    }
 
-      // reset UI
-      voc.removeAttribute('src'); acc.removeAttribute('src');
-      outHdr.style.display = 'none';
-      fill.style.width = '0%'; setStatus('Uploading…');
-
-      const fd = new FormData(); fd.append('file', file.files[0]);
-
-      try{
-        fill.style.width = '30%';
-        const res = await fetch('/process', { method:'POST', body: fd });
-        fill.style.width = '70%';
-
-        const j = await res.json();
-        if(!res.ok){ throw new Error(j.message || 'Failed'); }
-
-        // absolute URLs from backend; no string-pattern error
-        voc.src = j.vocal_path;
-        acc.src = j.instrumental_path;
-        outHdr.style.display = 'block';
-        fill.style.width = '100%';
-        setStatus('Done');
-      }catch(err){
-        setStatus('Error: ' + err.message);
-        fill.style.width = '0%';
+    function downloadAudio(type) {
+      const audioElement = type === 'voc' ? voc : acc;
+      const fileName = type === 'voc' ? 'vocals.wav' : 'instrumental.wav';
+      
+      if (audioElement.src) {
+        const a = document.createElement('a');
+        a.href = audioElement.src;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
+    }
+
+    frm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (!file.files.length) {
+        setStatus('Please choose a file first', true);
+        return;
+      }
+
+      // Reset UI
+      voc.removeAttribute('src');
+      acc.removeAttribute('src');
+      results.classList.add('hidden');
+      fill.style.width = '0%';
+      go.disabled = true;
+      
+      const formData = new FormData();
+      formData.append('file', file.files[0]);
+
+      try {
+        setStatus('Uploading file...');
+        fill.style.width = '25%';
+
+        const response = await fetch('/process', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `Server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.status === 'error') {
+          throw new Error(data.message || 'Processing failed');
+        }
+
+        setStatus('Processing complete!');
+        fill.style.width = '100%';
+
+        // Convert relative URLs to absolute URLs
+        const baseUrl = window.location.origin;
+        const vocalUrl = data.vocal_path.startsWith('http') ? data.vocal_path : baseUrl + data.vocal_path;
+        const accUrl = data.instrumental_path.startsWith('http') ? data.instrumental_path : baseUrl + data.instrumental_path;
+
+        // Set audio sources
+        voc.src = vocalUrl;
+        acc.src = accUrl;
+        
+        // Store paths for download
+        currentVocalPath = vocalUrl;
+        currentAccPath = accUrl;
+        
+        // Show results
+        results.classList.remove('hidden');
+        
+        // Add event listeners for audio loading
+        voc.onerror = () => setStatus('Error loading vocal track', true);
+        acc.onerror = () => setStatus('Error loading instrumental track', true);
+        
+      } catch (error) {
+        console.error('Processing error:', error);
+        setStatus('Error: ' + error.message, true);
+        fill.style.width = '0%';
+      } finally {
+        go.disabled = false;
+      }
+    });
+
+    // Add some event listeners for better UX
+    file.addEventListener('change', () => {
+      if (file.files.length) {
+        setStatus('Ready to process');
+      }
+    });
+
+    // Handle page load
+    window.addEventListener('load', () => {
+      setStatus('Select an audio file to begin');
     });
   </script>
 </body>
