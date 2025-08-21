@@ -1,13 +1,30 @@
+# ---- Base ----
 FROM python:3.9-slim
-ENV PIP_NO_CACHE_DIR=1 PIP_DEFAULT_TIMEOUT=1200 TF_CPP_MIN_LOG_LEVEL=2
+
+# System deps for audio
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg libsndfile1 build-essential && rm -rf /var/lib/apt/lists/*
+    ffmpeg libsndfile1 gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+# Runtime env
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+# Workdir
 WORKDIR /app
-COPY requirements.txt .
-RUN python -m pip install --upgrade pip setuptools wheel && \
-    pip install --retries 10 --timeout 1200 -r requirements.txt
+
+# Copy reqs first for better caching
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -U pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy app
 COPY . .
-ENV PORT=8000
-CMD ["gunicorn","-w","2","-k","gthread","-b","0.0.0.0:8000","app:app","--timeout","300"]
 
+# Expose port
+EXPOSE 8080
 
+# Start with Gunicorn
+# app:app => <file>:<Flask instance>
+CMD ["gunicorn", "-w", "2", "-k", "gthread", "-t", "180", "-b", "0.0.0.0:8080", "app:app"]
