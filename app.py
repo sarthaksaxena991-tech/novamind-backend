@@ -1,4 +1,5 @@
 import os, json, hashlib, logging, shutil
+import subprocess
 from collections import Counter
 from flask import Flask, jsonify, render_template, request, url_for, send_from_directory
 from flask_cors import CORS
@@ -11,23 +12,12 @@ CORS(app)  # Allow all origins
 
 # ---------- Config ----------
 THRESHOLD_NEG = 2
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_FILE_SIZE = 30 * 1024 * 1024  # 30 MB (smaller for free tier)
 UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "static/outputs"
 FEEDBACK_FILE = "learning_data.json"
 BAD_OUTPUTS_FILE = "outputs_to_improve.json"
 ALLOWED_EXTENSIONS = {'mp3', 'wav'}
-
-# Try to import spleeter (might fail on Render)
-SEPARATOR = None
-try:
-    from spleeter.separator import Separator
-    SEPARATOR = Separator("spleeter:2stems")
-    logging.info("Spleeter separator initialized successfully")
-except ImportError as e:
-    logging.warning(f"Spleeter not available: {e}")
-except Exception as e:
-    logging.error(f"Failed to initialize Spleeter: {e}")
 
 # ---------- Setup ----------
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -76,33 +66,45 @@ def is_problematic_output(output_id: str) -> bool:
             logging.error(f"Failed reading BAD_OUTPUTS_FILE: {e}")
     return False
 
-def convert_to_wav_if_needed(input_path: str) -> str:
-    """Convert non-WAV files to WAV for better Spleeter compatibility."""
-    if input_path.lower().endswith(".wav"):
-        return input_path
-    
+def separate_audio_demucs(input_path, output_dir):
+    """Use demucs for audio separation (lighter than spleeter)"""
     try:
-        # Try to import librosa (might not be available)
-        import librosa
-        import soundfile as sf
+        # Create output directory
+        os.makedirs(output_dir, exist_ok=True)
         
-        temp_path = os.path.join(UPLOAD_FOLDER, f"temp_{os.path.basename(input_path)}.wav")
-        y, sr = librosa.load(input_path, sr=None)
-        sf.write(temp_path, y, sr)
-        os.remove(input_path)
-        logging.info(f"Converted {input_path} to WAV format")
-        return temp_path
-    except ImportError:
-        logging.warning("Librosa not available for WAV conversion")
-        return input_path
+        # Run demucs command
+        cmd = [
+            "python", "-m", "demucs",
+            "--two-stems", "vocals",
+            "-n", "htdemucs",
+            "-o", output_dir,
+            input_path
+        ]
+        
+        result = subprocess.run(
+            cmd, 
+            capture_output=True, 
+            text=True, 
+            timeout=300  # 5 minute timeout
+        )
+        
+        if result.returncode != 0:
+            logging.error(f"Demucs failed: {result.stderr}")
+            return False
+            
+        return True
+        
+    except subprocess.TimeoutExpired:
+        logging.error("Demucs processing timed out")
+        return False
     except Exception as e:
-        logging.warning(f"Could not convert to WAV: {e}")
-        return input_path
+        logging.error(f"Demucs error: {e}")
+        return False
 
 # ---------- Routes ----------
 @app.route("/health")
 def health():
-    return jsonify({"status": "healthy", "spleeter_available": SEPARATOR is not None}), 200
+    return jsonify({"status": "healthy"}), 200
 
 @app.route("/")
 def index():
@@ -114,12 +116,6 @@ def serve_static(path):
 
 @app.route("/process", methods=["POST"])
 def process():
-    if SEPARATOR is None:
-        return jsonify({
-            "status": "error", 
-            "message": "Audio processing engine not available. Please try again later."
-        }), 503
-
     try:
         if "file" not in request.files:
             return jsonify({"status": "error", "message": "No file uploaded"}), 400
@@ -165,55 +161,42 @@ def process():
         with open(in_path, "wb") as w:
             w.write(file_content)
 
-        # Convert to WAV if needed
-        in_path = convert_to_wav_if_needed(in_path)
-
-        # Process with Spleeter
-        try:
-            SEPARATOR.separate_to_file(
-                in_path,
-                out_dir,
-                codec="wav",
-                bitrate="320k",
-                filename_format="{instrument}.{codec}",
-            )
-        except Exception as e:
-            logging.exception("Spleeter processing failed")
+        # Process with Demucs
+        success = separate_audio_demucs(in_path, out_dir)
+        if not success:
             return jsonify({
                 "status": "error",
-                "message": f"Audio processing failed. Please try a different file."
+                "message": "Audio processing failed. Please try a different file."
             }), 500
 
         # Find output files
-        vocal_path = os.path.join(out_dir, "vocals.wav")
-        accompaniment_path = os.path.join(out_dir, "accompaniment.wav")
+        # Demucs creates structure: output_dir/htdemucs/track_name/{vocals,other}.wav
+        track_name = os.path.splitext(os.path.basename(in_path))[0]
+        demucs_output = os.path.join(out_dir, "htdemucs", track_name)
         
-        if not os.path.exists(vocal_path) or not os.path.exists(accompaniment_path):
-            # Try alternative path structure
-            base_name = os.path.splitext(os.path.basename(in_path))[0]
-            alt_vocal_path = os.path.join(out_dir, base_name, "vocals.wav")
-            alt_accompaniment_path = os.path.join(out_dir, base_name, "accompaniment.wav")
-            
-            if os.path.exists(alt_vocal_path) and os.path.exists(alt_accompaniment_path):
-                vocal_path = alt_vocal_path
-                accompaniment_path = alt_accompaniment_path
-            else:
-                logging.error(f"Output files not found in {out_dir}")
-                return jsonify({
-                    "status": "error", 
-                    "message": "Processing completed but output files not found"
-                }), 500
+        vocal_path = os.path.join(demucs_output, "vocals.wav")
+        other_path = os.path.join(demucs_output, "other.wav")
+        
+        if not os.path.exists(vocal_path) or not os.path.exists(other_path):
+            logging.error(f"Output files not found in {demucs_output}")
+            return jsonify({
+                "status": "error", 
+                "message": "Processing completed but output files not found"
+            }), 500
+
+        # Move files to main output directory for easier access
+        final_vocal_path = os.path.join(out_dir, "vocals.wav")
+        final_other_path = os.path.join(out_dir, "instrumental.wav")
+        
+        shutil.move(vocal_path, final_vocal_path)
+        shutil.move(other_path, final_other_path)
+        
+        # Clean up demucs directory
+        shutil.rmtree(os.path.join(out_dir, "htdemucs"))
 
         # Generate URLs for the frontend
-        vocal_url = url_for('static', filename=os.path.relpath(vocal_path, 'static').replace('\\', '/'))
-        acc_url = url_for('static', filename=os.path.relpath(accompaniment_path, 'static').replace('\\', '/'))
-
-        # Save latest ID
-        try:
-            with open("latest_id.txt", "w", encoding="utf-8") as id_file:
-                id_file.write(file_id)
-        except Exception as e:
-            logging.warning(f"Could not save latest ID: {e}")
+        vocal_url = url_for('static', filename=os.path.relpath(final_vocal_path, 'static').replace('\\', '/'))
+        acc_url = url_for('static', filename=os.path.relpath(final_other_path, 'static').replace('\\', '/'))
 
         return jsonify({
             "status": "success",
@@ -318,6 +301,5 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
     
     logging.info(f"Starting Flask server on 0.0.0.0:{port}")
-    logging.info(f"Spleeter available: {SEPARATOR is not None}")
     
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
