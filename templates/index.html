@@ -2,223 +2,79 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>VOCAL REMOVER PRO</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vocal Remover Pro</title>
   <style>
-    :root { --bg:#0f1115; --panel:#171a21; --muted:#8b95a7; --text:#e6edf3; --primary:#e74141; --ok:#2ea043; }
-    * { box-sizing: border-box; }
-    html,body { height:100%; margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:linear-gradient(180deg,#0b0e13, #0f1115 30%);}
-    .wrap { max-width:900px; margin:48px auto; padding:24px; }
-    .card { background:var(--panel); border:1px solid #232736; border-radius:18px; padding:32px; box-shadow: 0 10px 30px rgba(0,0,0,.35);}
-    h1 { color:var(--text); margin:0 0 8px; letter-spacing:.5px; }
-    p.sub { color:var(--muted); margin:0 0 24px; }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .btn { border:0; padding:10px 16px; border-radius:10px; cursor:pointer; font-weight:600; }
-    .btn-primary { background:var(--primary); color:#fff; }
-    .btn-ok { background:#2c3a2f; color:#d7f5df; border:1px solid #395a44; }
-    .btn:disabled { opacity:.6; cursor:not-allowed; }
-    .chip { color:#d2d8e5; background:#1e232f; border:1px dashed #2b3347; padding:8px 12px; border-radius:10px; font-size:13px; }
-    .meter { height:6px; background:#10131a; border-radius:999px; overflow:hidden; margin-top:18px; border:1px solid #1f2635;}
-    .bar { width:0%; height:100%; background:linear-gradient(90deg,#e74141,#f59e0b); transition:width .2s ease; }
-    .status { margin-top:12px; font-size:13px; color:#c7cedd; min-height:18px;}
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:22px;}
-    .panel { background:#12161f; border:1px solid #232a3a; border-radius:14px; padding:16px; }
-    .title { color:#aab4c6; margin:0 0 10px; font-size:14px; letter-spacing:.2px;}
-    audio { width:100%; outline:none; }
-    a.dl { color:#9ad0ff; text-decoration:none; font-size:13px; }
-    .toast { position:fixed; right:18px; bottom:18px; background:#1a1f2b; color:#fff; padding:12px 14px; border-radius:10px; border:1px solid #273148; box-shadow:0 10px 24px rgba(0,0,0,.35); display:none;}
-    textarea { width:100%; background:#0f131b; color:#dbe4f0; border:1px solid #273148; border-radius:10px; padding:10px; }
+    body{background:#0f1218;color:#e6e6e6;font-family:system-ui,Segoe UI,Roboto,Arial}
+    .card{max-width:820px;margin:40px auto;padding:28px;border-radius:16px;background:#171a22;box-shadow:0 2px 12px #0008}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    button,input[type=file]{padding:10px 14px;border:0;border-radius:10px}
+    button{background:#e04b4b;color:#fff;cursor:pointer}
+    .muted{opacity:.75}
+    #bar{height:6px;background:#2b2f3a;border-radius:8px;overflow:hidden;margin-top:14px}
+    #bar>span{display:block;width:0;height:6px;background:#f0a23c;transition:width .3s}
+    audio{width:100%}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>VOCAL REMOVER PRO</h1>
-      <p class="sub">Choose an audio file. Click <b>Process Audio</b>. Get isolated vocals and accompaniment.</p>
+  <div class="card">
+    <h1>VOCAL REMOVER PRO</h1>
+    <p class="muted">Choose an audio file. Click <b>Process Audio</b>.</p>
 
-      <div class="row">
-        <input id="file" type="file" accept="audio/*" />
-        <span id="fileInfo" class="chip">No file selected</span>
-      </div>
+    <form id="frm" class="row">
+      <input id="file" type="file" accept=".mp3,.wav" />
+      <button id="go" type="submit">Process Audio</button>
+    </form>
 
-      <div class="row" style="margin-top:12px">
-        <button id="btnChoose" class="btn">Choose File</button>
-        <button id="btnProcess" class="btn btn-primary" disabled>Process Audio</button>
-      </div>
+    <div id="bar"><span id="fill"></span></div>
+    <p id="msg" class="muted">Idle</p>
 
-      <div class="meter"><div class="bar" id="bar"></div></div>
-      <div id="status" class="status">Idle</div>
-
-      <div id="outputs" class="grid" style="display:none">
-        <div class="panel">
-          <h3 class="title">Vocals</h3>
-          <audio id="voc" controls></audio>
-          <div style="margin-top:8px"><a id="voc_dl" class="dl" download>Download vocals.wav</a></div>
-        </div>
-        <div class="panel">
-          <h3 class="title">Accompaniment</h3>
-          <audio id="acc" controls></audio>
-          <div style="margin-top:8px"><a id="acc_dl" class="dl" download>Download accompaniment.wav</a></div>
-        </div>
-      </div>
-
-      <!-- Feedback panel -->
-      <div id="fb" class="panel" style="display:none; margin-top:16px;">
-        <h3 class="title">Feedback</h3>
-        <div class="row" style="margin-bottom:8px">
-          <button id="fb_good" class="btn btn-ok">Good</button>
-          <button id="fb_bad" class="btn btn-primary">Bad</button>
-        </div>
-        <textarea id="fb_txt" rows="3" placeholder="Optional: what was good/bad?"></textarea>
-        <div class="status" id="fb_status"></div>
-      </div>
-    </div>
+    <h3 id="outHdr" style="display:none;margin-top:18px">Result</h3>
+    <audio id="voc" controls></audio>
+    <audio id="acc" controls style="margin-top:8px"></audio>
   </div>
 
-  <div id="toast" class="toast"></div>
-
   <script>
-    const fileInput = document.getElementById('file');
-    const fileInfo = document.getElementById('fileInfo');
-    const btnChoose = document.getElementById('btnChoose');
-    const btnProcess = document.getElementById('btnProcess');
-    const bar = document.getElementById('bar');
-    const status = document.getElementById('status');
-    const outputs = document.getElementById('outputs');
-    const voc = document.getElementById('voc');
-    const acc = document.getElementById('acc');
-    const voc_dl = document.getElementById('voc_dl');
-    const acc_dl = document.getElementById('acc_dl');
-    const toast = document.getElementById('toast');
+    const frm = document.getElementById('frm');
+    const file = document.getElementById('file');
+    const fill = document.getElementById('fill');
+    const msg  = document.getElementById('msg');
+    const voc  = document.getElementById('voc');
+    const acc  = document.getElementById('acc');
+    const outHdr = document.getElementById('outHdr');
 
-    const fbPanel = document.getElementById('fb');
-    const fbTxt = document.getElementById('fb_txt');
-    const fbStatus = document.getElementById('fb_status');
-    let CURRENT_JOB_ID = null;
+    function setStatus(t){ msg.textContent = t; }
 
-    function showToast(msg) {
-      toast.textContent = msg; toast.style.display = 'block';
-      setTimeout(()=> toast.style.display='none', 3000);
-    }
-
-    btnChoose.onclick = () => fileInput.click();
-
-    fileInput.onchange = () => {
-      const f = fileInput.files[0];
-      if (!f) { fileInfo.textContent = 'No file selected'; btnProcess.disabled = true; return; }
-      fileInfo.textContent = `${f.name} (${(f.size/1024/1024).toFixed(2)} MB)`;
-      btnProcess.disabled = false;
-      outputs.style.display = 'none';
-      fbPanel.style.display = 'none';
-      bar.style.width = '0%';
-      status.textContent = 'Ready to process';
-    };
-
-    async function upload() {
-      const f = fileInput.files[0];
-      if (!f) { showToast('Pick a file'); return; }
-      if (f.size > 50*1024*1024) { showToast('File too large (>50 MB)'); return; }
-
-      btnProcess.disabled = true;
-      bar.style.width = '15%';
-      status.textContent = 'Uploading…';
-
-      const fd = new FormData(); fd.append('file', f);
-
-      try {
-        const r = await fetch('/upload', { method:'POST', body: fd });
-        bar.style.width = '55%';
-        if (!r.ok) {
-          const txt = await r.text().catch(()=> 'Server error');
-          showToast(`Error ${r.status}: ${txt}`);
-          status.textContent = `Failed (${r.status})`;
-          btnProcess.disabled = false;
-          return;
-        }
-        const j = await r.json();
-        bar.style.width = '90%';
-        status.textContent = 'Rendering players…';
-
-        voc.src = j.vocals;
-        acc.src = j.accompaniment;
-        voc_dl.href = j.vocals; acc_dl.href = j.accompaniment;
-        outputs.style.display = 'grid';
-        bar.style.width = '100%';
-        status.textContent = 'Done';
-        showToast('Separation complete');
-
-        // feedback wiring
-        CURRENT_JOB_ID = j.job_id || null;
-        fbPanel.style.display = CURRENT_JOB_ID ? 'block' : 'none';
-        fbStatus.textContent = '';
-      } catch (e) {
-        showToast('Network error');
-        status.textContent = 'Network error';
-      } finally {
-        btnProcess.disabled = false;
-      }
-    }
-    btnProcess.onclick = upload;
-
-    async function sendFeedback(rating) {
-      if (!CURRENT_JOB_ID) { fbStatus.textContent = "No job id."; return; }
-      fbStatus.textContent = "Sending...";
-      try {
-        const res = await fetch('/feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ job_id: CURRENT_JOB_ID, rating, note: fbTxt.value || "" })
-        });
-        if (!res.ok) { fbStatus.textContent = "Server error " + res.status; return; }
-        const j = await res.json();
-        fbStatus.textContent = j.flagged ? "Saved. Marked for improvement." : "Saved";
-      } catch { fbStatus.textContent = "Network error"; }
-    }
-    document.getElementById('fb_good').onclick = () => sendFeedback('good');
-    document.getElementById('fb_bad').onclick  = () => sendFeedback('bad');
-
-    // drag & drop
-    document.addEventListener('dragover', e => { e.preventDefault(); });
-    document.addEventListener('drop', e => {
+    frm.addEventListener('submit', async (e)=>{
       e.preventDefault();
-      if (e.dataTransfer.files?.length) {
-        fileInput.files = e.dataTransfer.files;
-        fileInput.onchange();
+      if(!file.files.length){ setStatus('Choose a file'); return; }
+
+      // reset UI
+      voc.removeAttribute('src'); acc.removeAttribute('src');
+      outHdr.style.display = 'none';
+      fill.style.width = '0%'; setStatus('Uploading…');
+
+      const fd = new FormData(); fd.append('file', file.files[0]);
+
+      try{
+        fill.style.width = '30%';
+        const res = await fetch('/process', { method:'POST', body: fd });
+        fill.style.width = '70%';
+
+        const j = await res.json();
+        if(!res.ok){ throw new Error(j.message || 'Failed'); }
+
+        // absolute URLs from backend; no string-pattern error
+        voc.src = j.vocal_path;
+        acc.src = j.instrumental_path;
+        outHdr.style.display = 'block';
+        fill.style.width = '100%';
+        setStatus('Done');
+      }catch(err){
+        setStatus('Error: ' + err.message);
+        fill.style.width = '0%';
       }
     });
   </script>
-
-  <form id="vr-form" enctype="multipart/form-data">
-  <input type="file" id="audioFile" name="file" accept=".mp3,.wav" required />
-  <button type="submit">Process Audio</button>
-</form>
-<p id="msg"></p>
-<audio id="vocal" controls></audio>
-<audio id="inst" controls></audio>
-
-<script>
-  const BASE = "";
-  document.getElementById("vr-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const f = document.getElementById("audioFile").files[0];
-    if (!f) return show("Select a file first");
-
-    const fd = new FormData();
-    fd.append("file", f);
-
-    show("Processing...");
-    try {
-      const res = await fetch(BASE + "/process", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok || data.status !== "success") throw new Error(data.message || "Failed");
-
-      document.getElementById("vocal").src = data.vocal_path;
-      document.getElementById("inst").src  = data.instrumental_path;
-      show("Done ✅");
-    } catch (err) { show("Error: " + err.message); }
-  });
-  function show(t){ document.getElementById("msg").textContent = t; }
-</script>
-
 </body>
 </html>
