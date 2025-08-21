@@ -1,15 +1,19 @@
-# Web
-flask==2.3.3
-flask-cors==4.0.0
-gunicorn==21.2.0
+# --- Web stack (compatible with click 7.x) ---
+Flask==2.0.3
+Werkzeug==2.0.3
+Jinja2==3.0.3
+itsdangerous==2.0.1
+flask-cors==3.0.10
+gunicorn==20.1.0
 click==7.1.2
-
 typing-extensions==4.5.0
+typer==0.3.2
 
-# Audio + numeric
+# --- Audio + numeric ---
 numpy==1.23.5
 scipy==1.10.1
 scikit-learn==1.1.3
+pandas==1.5.3
 librosa==0.10.2.post1
 soundfile==0.12.1
 audioread==3.0.1
@@ -17,9 +21,8 @@ ffmpeg-python==0.2.0
 numba==0.58.1
 llvmlite==0.41.1
 soxr==0.3.7
-pandas==1.5.3
 
-# Spleeter + TF (compatible set)
+# --- Spleeter + TF ---
 spleeter==2.4.0
 tensorflow==2.9.3
 tensorboard==2.9.1
