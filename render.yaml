@@ -3,18 +3,8 @@ services:
     name: novamind-backend
     env: python
     plan: free
-    buildCommand: |
-      python -m pip install -U pip
-      pip install -r requirements.txt
-      python -m venv spleeter-env
-      ./spleeter-env/bin/pip install --no-cache-dir \
-        "spleeter==2.4.0" "typer==0.3.2" "click==7.1.2" \
-        "tensorflow==2.9.3" "tensorboard==2.9.1" "tensorflow-estimator==2.9.0" \
-        "protobuf==3.19.6" "flatbuffers==1.12"
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
-      - key: SPLEETER_PY
-        value: /opt/render/project/src/spleeter-env/bin/python
-
