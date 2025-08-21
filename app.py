@@ -3,12 +3,11 @@ from collections import Counter
 from flask import Flask, jsonify, render_template, request, url_for, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from datetime import datetime
 
-from spleeter.separator import Separator
-
-# ---------- Flask ----------
+# Initialize Flask app first
 app = Flask(__name__, template_folder="templates", static_folder="static")
-CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins
+CORS(app)  # Allow all origins
 
 # ---------- Config ----------
 THRESHOLD_NEG = 2
@@ -17,28 +16,28 @@ UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "static/outputs"
 FEEDBACK_FILE = "learning_data.json"
 BAD_OUTPUTS_FILE = "outputs_to_improve.json"
-ALLOWED_EXTENSIONS = {'mp3', 'wav', 'ogg', 'm4a', 'flac'}
+ALLOWED_EXTENSIONS = {'mp3', 'wav'}
 
-# Initialize Spleeter separator
+# Try to import spleeter (might fail on Render)
+SEPARATOR = None
 try:
+    from spleeter.separator import Separator
     SEPARATOR = Separator("spleeter:2stems")
     logging.info("Spleeter separator initialized successfully")
+except ImportError as e:
+    logging.warning(f"Spleeter not available: {e}")
 except Exception as e:
     logging.error(f"Failed to initialize Spleeter: {e}")
-    SEPARATOR = None
 
 # ---------- Setup ----------
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-if not os.path.exists(FEEDBACK_FILE):
-    with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
-        json.dump([], f)
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("app.log")],
+    handlers=[logging.StreamHandler()]
 )
 
 def allowed_file(filename):
@@ -47,8 +46,11 @@ def allowed_file(filename):
 
 def rebuild_flags_from_feedback():
     try:
-        with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
-            fb = json.load(f)
+        if os.path.exists(FEEDBACK_FILE):
+            with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
+                fb = json.load(f)
+        else:
+            fb = []
     except Exception as e:
         logging.warning(f"Could not read feedback file: {e}")
         fb = []
@@ -80,6 +82,7 @@ def convert_to_wav_if_needed(input_path: str) -> str:
         return input_path
     
     try:
+        # Try to import librosa (might not be available)
         import librosa
         import soundfile as sf
         
@@ -89,6 +92,9 @@ def convert_to_wav_if_needed(input_path: str) -> str:
         os.remove(input_path)
         logging.info(f"Converted {input_path} to WAV format")
         return temp_path
+    except ImportError:
+        logging.warning("Librosa not available for WAV conversion")
+        return input_path
     except Exception as e:
         logging.warning(f"Could not convert to WAV: {e}")
         return input_path
@@ -96,7 +102,7 @@ def convert_to_wav_if_needed(input_path: str) -> str:
 # ---------- Routes ----------
 @app.route("/health")
 def health():
-    return jsonify({"status": "healthy"}), 200
+    return jsonify({"status": "healthy", "spleeter_available": SEPARATOR is not None}), 200
 
 @app.route("/")
 def index():
@@ -111,8 +117,8 @@ def process():
     if SEPARATOR is None:
         return jsonify({
             "status": "error", 
-            "message": "Spleeter not initialized. Please check server logs."
-        }), 500
+            "message": "Audio processing engine not available. Please try again later."
+        }), 503
 
     try:
         if "file" not in request.files:
@@ -125,22 +131,21 @@ def process():
         if not allowed_file(f.filename):
             return jsonify({
                 "status": "error", 
-                "message": f"File type not allowed. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+                "message": f"Only MP3 and WAV files are supported"
             }), 400
 
         # Read file with size limit
-        f.stream.seek(0, os.SEEK_END)
-        file_size = f.stream.tell()
-        f.stream.seek(0)
-        
-        if file_size > MAX_FILE_SIZE:
+        file_content = f.read()
+        if len(file_content) > MAX_FILE_SIZE:
             return jsonify({
                 "status": "error", 
                 "message": f"File too large (max {MAX_FILE_SIZE//1024//1024}MB)"
             }), 400
 
+        if len(file_content) == 0:
+            return jsonify({"status": "error", "message": "Empty file"}), 400
+
         # Generate unique file ID
-        file_content = f.read()
         file_id = hashlib.md5(file_content).hexdigest()
         ext = os.path.splitext(f.filename)[1] or ".wav"
         safe_filename = secure_filename(f.filename)
@@ -176,31 +181,32 @@ def process():
             logging.exception("Spleeter processing failed")
             return jsonify({
                 "status": "error",
-                "message": f"Audio processing failed: {str(e)}"
+                "message": f"Audio processing failed. Please try a different file."
             }), 500
 
         # Find output files
-        base_name = os.path.splitext(os.path.basename(in_path))[0]
-        possible_paths = [
-            os.path.join(out_dir, base_name, "vocals.wav"),
-            os.path.join(out_dir, base_name, "accompaniment.wav"),
-            os.path.join(out_dir, "vocals.wav"),
-            os.path.join(out_dir, "accompaniment.wav"),
-        ]
+        vocal_path = os.path.join(out_dir, "vocals.wav")
+        accompaniment_path = os.path.join(out_dir, "accompaniment.wav")
         
-        voc = next((p for p in possible_paths if os.path.exists(p) and "vocal" in p), None)
-        acc = next((p for p in possible_paths if os.path.exists(p) and "accompaniment" in p), None)
-        
-        if not voc or not acc:
-            logging.error(f"Output files not found. Searched: {possible_paths}")
-            return jsonify({
-                "status": "error", 
-                "message": "Processing completed but output files not found"
-            }), 500
+        if not os.path.exists(vocal_path) or not os.path.exists(accompaniment_path):
+            # Try alternative path structure
+            base_name = os.path.splitext(os.path.basename(in_path))[0]
+            alt_vocal_path = os.path.join(out_dir, base_name, "vocals.wav")
+            alt_accompaniment_path = os.path.join(out_dir, base_name, "accompaniment.wav")
+            
+            if os.path.exists(alt_vocal_path) and os.path.exists(alt_accompaniment_path):
+                vocal_path = alt_vocal_path
+                accompaniment_path = alt_accompaniment_path
+            else:
+                logging.error(f"Output files not found in {out_dir}")
+                return jsonify({
+                    "status": "error", 
+                    "message": "Processing completed but output files not found"
+                }), 500
 
         # Generate URLs for the frontend
-        vocal_url = url_for('static', filename=os.path.relpath(voc, 'static').replace('\\', '/'))
-        acc_url = url_for('static', filename=os.path.relpath(acc, 'static').replace('\\', '/'))
+        vocal_url = url_for('static', filename=os.path.relpath(vocal_path, 'static').replace('\\', '/'))
+        acc_url = url_for('static', filename=os.path.relpath(accompaniment_path, 'static').replace('\\', '/'))
 
         # Save latest ID
         try:
@@ -222,7 +228,7 @@ def process():
         logging.exception("Unexpected processing error")
         return jsonify({
             "status": "error", 
-            "message": f"Server error: {type(e).__name__}"
+            "message": f"Server error: Please try again later."
         }), 500
     
     finally:
@@ -287,7 +293,7 @@ def feedback():
         logging.exception("Feedback processing error")
         return jsonify({
             "status": "error", 
-            "message": f"Error processing feedback: {str(e)}"
+            "message": f"Error processing feedback"
         }), 500
 
 @app.errorhandler(404)
@@ -299,16 +305,19 @@ def internal_error(error):
     return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    # Initialize bad outputs file if it doesn't exist
-    if not os.path.exists(BAD_OUTPUTS_FILE):
-        with open(BAD_OUTPUTS_FILE, "w", encoding="utf-8") as f:
-            json.dump([], f)
+    # Initialize files if they don't exist
+    for file_path in [FEEDBACK_FILE, BAD_OUTPUTS_FILE]:
+        if not os.path.exists(file_path):
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump([], f)
     
     # Rebuild flags from existing feedback
     rebuild_flags_from_feedback()
     
     # Get port from environment variable or use default
-    port = int(os.getenv("PORT", 5050))
+    port = int(os.getenv("PORT", 10000))
     
     logging.info(f"Starting Flask server on 0.0.0.0:{port}")
+    logging.info(f"Spleeter available: {SEPARATOR is not None}")
+    
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
