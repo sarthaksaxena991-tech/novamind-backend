@@ -22,11 +22,13 @@ BAD_OUTPUTS_FILE   = "outputs_to_improve.json"
 THRESHOLD_NEG      = 2
 REBUILD_INTERVAL_S = int(os.getenv("REBUILD_INTERVAL_SECONDS", "1800"))
 
+# --- setup ---
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_ROOT,   exist_ok=True)
 for p in (FEEDBACK_FILE, BAD_OUTPUTS_FILE):
     if not os.path.exists(p):
-        json.dump([], open(p, "w", encoding="utf-8"))
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump([], f)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +61,8 @@ def ffprobe_channels(path: str) -> Optional[int]:
 def rebuild_flags_from_feedback():
     try:
         fb = json.load(open(FEEDBACK_FILE, "r", encoding="utf-8"))
-        if not isinstance(fb, list): fb = []
+        if not isinstance(fb, list):
+            fb = []
     except Exception:
         fb = []
     neg = Counter(x.get("output_id") for x in fb if x.get("rating") == "negative")
@@ -85,12 +88,9 @@ def mp3_encoder() -> str:
         text = r.stdout
     except Exception:
         text = ""
-    # prefer libmp3lame, else native ffmpeg mp3 encoder
     _MP3_ENCODER = "libmp3lame" if "libmp3lame" in text else "mp3"
     logging.info("Using MP3 encoder: %s", _MP3_ENCODER)
     return _MP3_ENCODER
-
-
 
 # ---- FFmpeg filter detection + builders ----
 _FILTER_LIST: Optional[str] = None
@@ -116,11 +116,9 @@ def build_filters() -> Tuple[str, str, Dict[str,bool]]:
         vocal = "stereotools=mlev=1:slev=0"
         instr = "stereotools=mlev=0:slev=1"
     else:
-        # Fallback to pan mid/side approximation
         vocal = "pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1"
         instr = "pan=stereo|c0=c0-c1|c1=c1-c0"
 
-    # add tone-shaping + dynamics if available
     if dyn:
         vocal += ",highpass=f=120,lowpass=f=9000,dynaudnorm=f=75:s=10"
         instr += ",highpass=f=60,lowpass=f=16000,dynaudnorm=f=250:s=10"
@@ -160,35 +158,45 @@ def separate_ffmpeg(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, A
     instr_mp3 = os.path.join(output_dir, "instrumental.mp3")
 
     vocal_filter, instr_filter, filt_avail = build_filters()
-try:
-    enc = mp3_encoder()  # libmp3lame available ho to use, warna built-in mp3
 
-    r1 = subprocess.run(
-        ["ffmpeg","-y","-i",input_path,"-af",vocal_filter,"-c:a",enc,"-qscale:a","2",vocal_mp3],
-        capture_output=True, text=True, timeout=240
-    )
-    if r1.returncode != 0:
-        return False, {"reason": "ffmpeg_error_vocal", "stderr": r1.stderr[-4000:], "filters": filt_avail}
+    try:
+        enc = mp3_encoder()
 
-    r2 = subprocess.run(
-        ["ffmpeg","-y","-i",input_path,"-af",instr_filter,"-c:a",enc,"-qscale:a","2",instr_mp3],
-        capture_output=True, text=True, timeout=240
-    )
-    if r2.returncode != 0:
-        return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:], "filters": filt_avail}
+        r1 = subprocess.run(
+            ["ffmpeg","-y","-i",input_path,"-af",vocal_filter,"-c:a",enc,"-qscale:a","2",vocal_mp3],
+            capture_output=True, text=True, timeout=240
+        )
+        if r1.returncode != 0:
+            return False, {"reason": "ffmpeg_error_vocal", "stderr": r1.stderr[-4000:], "filters": filt_avail}
 
-    in_sz = os.path.getsize(input_path)
-    v_sz  = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
-    i_sz  = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
-    if v_sz < max(64_000, 0.05 * in_sz) or i_sz < max(64_000, 0.02 * in_sz):
-        return False, {"reason": "weak_separation", "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz, "filters": filt_avail}
+        r2 = subprocess.run(
+            ["ffmpeg","-y","-i",input_path,"-af",instr_filter,"-c:a",enc,"-qscale:a","2",instr_mp3],
+            capture_output=True, text=True, timeout=240
+        )
+        if r2.returncode != 0:
+            return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:], "filters": filt_avail}
 
-    return True, {"mode": "ffmpeg", "side_rms_db": s_db, "filters": filt_avail,
-                  "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
-except subprocess.TimeoutExpired:
-    return False, {"reason": "timeout"}
-except Exception as e:
-    return False, {"reason": "exception", "error": str(e)}
+        in_sz = os.path.getsize(input_path)
+        v_sz  = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
+        i_sz  = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
+        if v_sz < max(64_000, 0.05 * in_sz) or i_sz < max(64_000, 0.02 * in_sz):
+            return False, {"reason": "weak_separation", "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz, "filters": filt_avail}
+
+        return True, {
+            "mode": "ffmpeg",
+            "side_rms_db": s_db,
+            "filters": filt_avail,
+            "v_bytes": v_sz,
+            "i_bytes": i_sz,
+            "in_bytes": in_sz
+        }
+    except subprocess.TimeoutExpired:
+        return False, {"reason": "timeout"}
+    except Exception as e:
+        return False, {"reason": "exception", "error": str(e)}
+
+def separate_audio(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
+    return separate_ffmpeg(input_path, output_dir)
 
 # ---------------- automation ----------------
 _stop = threading.Event()
@@ -250,11 +258,13 @@ def process():
         out_dir = os.path.join(OUTPUT_ROOT,  f"output_{file_id}")
 
         try:
-            if os.path.exists(out_dir): shutil.rmtree(out_dir)
+            if os.path.exists(out_dir):
+                shutil.rmtree(out_dir)
         except Exception:
             pass
         os.makedirs(out_dir, exist_ok=True)
-        with open(in_path, "wb") as w: w.write(blob)
+        with open(in_path, "wb") as w:
+            w.write(blob)
 
         ok_sep, notes = separate_audio(in_path, out_dir)
         if not ok_sep:
