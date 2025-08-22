@@ -1,0 +1,9 @@
+venv/
+spleeter_env/
+uploads/
+static/outputs/
+*.log
+learning_data.json
+outputs_to_improve.json
+__pycache__/
+*.pyc
