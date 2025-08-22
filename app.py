@@ -1,4 +1,4 @@
-# app.py — minimal, stable backend (MP3 output + feedback flags + 30-min automation)
+# app.py — FFmpeg-only backend (MP3 output + feedback flags + 30-min automation)
 
 import os, json, hashlib, logging, shutil, subprocess, threading
 from datetime import datetime
@@ -19,13 +19,10 @@ OUTPUT_ROOT   = "static/outputs"
 MAX_FILE_SIZE = 30 * 1024 * 1024  # 30 MB
 ALLOWED_EXT   = {"mp3", "wav"}
 
-# Spleeter CLI path (set full path on Windows if needed)
-SPLEETER_BIN  = os.getenv("SPLEETER_BIN", "spleeter")
-
 # Feedback + automation
-FEEDBACK_FILE    = "learning_data.json"
-BAD_OUTPUTS_FILE = "outputs_to_improve.json"
-THRESHOLD_NEG    = 2
+FEEDBACK_FILE      = "learning_data.json"
+BAD_OUTPUTS_FILE   = "outputs_to_improve.json"
+THRESHOLD_NEG      = 2
 REBUILD_INTERVAL_S = int(os.getenv("REBUILD_INTERVAL_SECONDS", "1800"))  # 30 min
 
 # ---------------- Setup ----------------
@@ -53,6 +50,18 @@ def ok(cmd: List[str]) -> bool:
     except Exception:
         return False
 
+def ffprobe_channels(path: str) -> Optional[int]:
+    try:
+        r = subprocess.run(
+            ["ffprobe","-v","error","-select_streams","a:0","-show_entries","stream=channels","-of","csv=p=0", path],
+            capture_output=True, text=True, timeout=20
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            return int(r.stdout.strip())
+    except Exception:
+        pass
+    return None
+
 def rebuild_flags_from_feedback():
     try:
         fb = json.load(open(FEEDBACK_FILE, "r", encoding="utf-8"))
@@ -77,6 +86,67 @@ def is_problematic_output(output_id: str) -> bool:
     except Exception:
         return False
 
+# ---------------- FFmpeg separation ----------------
+def separate_ffmpeg(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Mid/Side trick:
+      - Vocals  ~ mid (L+R)/2 with gentle EQ/normalization
+      - Instr.  ~ side (L-R, R-L) with gentle EQ/normalization
+    """
+    ch = ffprobe_channels(input_path)
+    if ch is None:
+        return False, {"reason": "probe_failed"}
+    if ch < 2:
+        return False, {"reason": "non_stereo", "channels": ch}
+
+    os.makedirs(output_dir, exist_ok=True)
+    vocal_mp3 = os.path.join(output_dir, "vocals.mp3")
+    instr_mp3 = os.path.join(output_dir, "instrumental.mp3")
+
+    # Filters tuned to be conservative and fast
+    vocal_filter = (
+        "pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1,"
+        "highpass=f=120,lowpass=f=7000,"
+        "dynaudnorm=f=75:s=10"
+    )
+    instr_filter = (
+        "pan=stereo|c0=c0-c1|c1=c1-c0,"
+        "highpass=f=40,lowpass=f=16000,"
+        "dynaudnorm=f=250:s=10"
+    )
+
+    try:
+        r1 = subprocess.run(
+            ["ffmpeg","-y","-i",input_path,"-af",vocal_filter,"-codec:a","libmp3lame","-qscale:a","2", vocal_mp3],
+            capture_output=True, text=True, timeout=240
+        )
+        if r1.returncode != 0:
+            return False, {"reason": "ffmpeg_error_vocal", "stderr": r1.stderr[-4000:]}
+
+        r2 = subprocess.run(
+            ["ffmpeg","-y","-i",input_path,"-af",instr_filter,"-codec:a","libmp3lame","-qscale:a","2", instr_mp3],
+            capture_output=True, text=True, timeout=240
+        )
+        if r2.returncode != 0:
+            return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:]}
+
+        # Heuristic sanity check
+        in_sz   = os.path.getsize(input_path)
+        voc_sz  = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
+        ins_sz  = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
+        if voc_sz < max(64_000, 0.05 * in_sz) or ins_sz < max(64_000, 0.05 * in_sz):
+            return False, {"reason": "weak_separation", "voc_bytes": voc_sz, "ins_bytes": ins_sz, "in_bytes": in_sz}
+
+        return True, {"mode": "ffmpeg", "channels": ch, "voc_bytes": voc_sz, "ins_bytes": ins_sz, "in_bytes": in_sz}
+    except subprocess.TimeoutExpired:
+        return False, {"reason": "timeout"}
+    except Exception as e:
+        return False, {"reason": "exception", "error": str(e)}
+
+def separate_audio(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
+    # Force FFmpeg path only
+    return separate_ffmpeg(input_path, output_dir)
+
 # ---------------- Automation (30 min) ----------------
 _stop = threading.Event()
 def _loop():
@@ -97,8 +167,7 @@ def health():
         "status": "healthy",
         "ffmpeg":  ok(["ffmpeg", "-version"]),
         "ffprobe": ok(["ffprobe", "-version"]),
-        "spleeter": ok([SPLEETER_BIN, "--help"]),
-        "mode": "spleeter",
+        "mode": "ffmpeg",
         "automation_interval_sec": REBUILD_INTERVAL_S
     }), 200
 
@@ -132,7 +201,6 @@ def process():
         safe    = secure_filename(f.filename)
         in_path = os.path.join(UPLOAD_FOLDER, f"input_{file_id}_{safe}")
         out_dir = os.path.join(OUTPUT_ROOT,  f"output_{file_id}")
-        tmp_root = os.path.join(out_dir, "_spleeter_tmp")
 
         # clean + prep
         try:
@@ -144,47 +212,34 @@ def process():
         with open(in_path, "wb") as w:
             w.write(blob)
 
-        # Spleeter 2-stems to WAVs
-        cmd = [SPLEETER_BIN, "separate", "-p", "spleeter:2stems", "-o", tmp_root, in_path]
-        logging.info("REQ %s spleeter: %s", req_id, " ".join(cmd))
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if r.returncode != 0:
-            logging.error("REQ %s spleeter stderr: %s", req_id, r.stderr)
-            return jsonify({"status":"error","message":"Spleeter failed","detail":r.stderr}), 500
+        ok_sep, notes = separate_audio(in_path, out_dir)
+        if not ok_sep:
+            reason = notes.get("reason","processing_failed")
+            msg = {
+                "probe_failed": "Could not inspect audio.",
+                "non_stereo": f"Stereo audio required. Channels={notes.get('channels','?')}.",
+                "ffmpeg_error_vocal": "FFmpeg failed while creating vocal track.",
+                "ffmpeg_error_instr": "FFmpeg failed while creating instrumental track.",
+                "weak_separation": "Separation too weak for this file.",
+                "timeout": "Processing timed out.",
+                "exception": "Unexpected error during processing."
+            }.get(reason, f"Audio processing failed: {reason}")
+            logging.error("REQ %s fail: %s %s", req_id, reason, notes)
+            return jsonify({"status":"error","message":msg,"detail":notes}), 400
 
-        base = os.path.splitext(os.path.basename(in_path))[0]
-        out_wav_dir = os.path.join(tmp_root, base)
-        voc_wav = os.path.join(out_wav_dir, "vocals.wav")
-        acc_wav = os.path.join(out_wav_dir, "accompaniment.wav")
-        if not (os.path.exists(voc_wav) and os.path.exists(acc_wav)):
-            return jsonify({"status":"error","message":"Spleeter outputs missing"}), 500
-
-        # Encode to MP3 (libmp3lame, VBR q=2)
         voc_mp3 = os.path.join(out_dir, "vocals.mp3")
-        acc_mp3 = os.path.join(out_dir, "instrumental.mp3")
-        for src, dst in ((voc_wav, voc_mp3), (acc_wav, acc_mp3)):
-            enc = ["ffmpeg","-y","-i",src,"-codec:a","libmp3lame","-qscale:a","2",dst]
-            er = subprocess.run(enc, capture_output=True, text=True, timeout=180)
-            if er.returncode != 0:
-                logging.error("REQ %s encode stderr: %s", req_id, er.stderr)
-                return jsonify({"status":"error","message":"Encoding failed","detail":er.stderr}), 500
-
-        # cleanup tmp
-        try:
-            shutil.rmtree(tmp_root)
-        except Exception:
-            pass
-
+        ins_mp3 = os.path.join(out_dir, "instrumental.mp3")
         voc_url = url_for("static", filename=os.path.relpath(voc_mp3, "static").replace("\\","/"))
-        acc_url = url_for("static", filename=os.path.relpath(acc_mp3, "static").replace("\\","/"))
+        ins_url = url_for("static", filename=os.path.relpath(ins_mp3, "static").replace("\\","/"))
 
         return jsonify({
             "status": "success",
             "message": "Processing complete",
             "vocal_path": voc_url,
-            "instrumental_path": acc_url,
+            "instrumental_path": ins_url,
             "output_id": file_id,
-            "flagged": is_problematic_output(file_id)
+            "flagged": is_problematic_output(file_id),
+            "processing_info": notes
         }), 200
 
     except subprocess.TimeoutExpired:
@@ -237,5 +292,5 @@ def internal_error(_):
 # ---------------- Main ----------------
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
-    logging.info("Starting on 0.0.0.0:%s (mode=spleeter, interval=%ss)", port, REBUILD_INTERVAL_S)
+    logging.info("Starting on 0.0.0.0:%s (mode=ffmpeg, interval=%ss)", port, REBUILD_INTERVAL_S)
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True, use_reloader=False)
