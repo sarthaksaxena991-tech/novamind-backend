@@ -1,4 +1,4 @@
-# app.py — FFmpeg-only backend (MP3 output + feedback flags + 30-min automation)
+# app.py — FFmpeg-only backend with filter auto-detect + fallbacks
 
 import os, json, hashlib, logging, shutil, subprocess, threading
 from datetime import datetime
@@ -9,29 +9,24 @@ from flask import Flask, jsonify, render_template, request, url_for, send_from_d
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-# ---------------- Flask ----------------
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
 
-# ---------------- Config ----------------
 UPLOAD_FOLDER = "uploads"
 OUTPUT_ROOT   = "static/outputs"
-MAX_FILE_SIZE = 30 * 1024 * 1024  # 30 MB
+MAX_FILE_SIZE = 30 * 1024 * 1024
 ALLOWED_EXT   = {"mp3", "wav"}
 
 FEEDBACK_FILE      = "learning_data.json"
 BAD_OUTPUTS_FILE   = "outputs_to_improve.json"
 THRESHOLD_NEG      = 2
-REBUILD_INTERVAL_S = int(os.getenv("REBUILD_INTERVAL_SECONDS", "1800"))  # 30 min
+REBUILD_INTERVAL_S = int(os.getenv("REBUILD_INTERVAL_SECONDS", "1800"))
 
-# ---------------- Setup ----------------
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_ROOT,   exist_ok=True)
-
 for p in (FEEDBACK_FILE, BAD_OUTPUTS_FILE):
     if not os.path.exists(p):
-        with open(p, "w", encoding="utf-8") as f:
-            json.dump([] if p == FEEDBACK_FILE else [], f)
+        json.dump([], open(p, "w", encoding="utf-8"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,7 +34,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(), logging.FileHandler("vocal_remover.log", encoding="utf-8")]
 )
 
-# ---------------- Helpers ----------------
+# ---------------- helpers ----------------
 def allowed(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXT
 
@@ -64,95 +59,113 @@ def ffprobe_channels(path: str) -> Optional[int]:
 def rebuild_flags_from_feedback():
     try:
         fb = json.load(open(FEEDBACK_FILE, "r", encoding="utf-8"))
-        if not isinstance(fb, list):
-            fb = []
+        if not isinstance(fb, list): fb = []
     except Exception:
         fb = []
     neg = Counter(x.get("output_id") for x in fb if x.get("rating") == "negative")
     pos = Counter(x.get("output_id") for x in fb if x.get("rating") == "positive")
     flagged = sorted({oid for oid, n in neg.items() if oid and n >= THRESHOLD_NEG and n > pos.get(oid, 0)})
-    try:
-        with open(BAD_OUTPUTS_FILE, "w", encoding="utf-8") as f:
-            json.dump(flagged, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+    json.dump(flagged, open(BAD_OUTPUTS_FILE, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
     return set(flagged)
 
 def is_problematic_output(output_id: str) -> bool:
     try:
-        bad = json.load(open(BAD_OUTPUTS_FILE, "r", encoding="utf-8"))
-        return output_id in bad
+        return output_id in json.load(open(BAD_OUTPUTS_FILE, "r", encoding="utf-8"))
     except Exception:
         return False
 
+# ---- FFmpeg filter detection + builders ----
+_FILTER_LIST: Optional[str] = None
+def ff_filters() -> str:
+    global _FILTER_LIST
+    if _FILTER_LIST is None:
+        try:
+            r = subprocess.run(["ffmpeg","-hide_banner","-filters"], capture_output=True, text=True, timeout=20)
+            _FILTER_LIST = r.stdout
+        except Exception:
+            _FILTER_LIST = ""
+    return _FILTER_LIST
+
+def has_filter(name: str) -> bool:
+    return name in ff_filters()
+
+def build_filters() -> Tuple[str, str, Dict[str,bool]]:
+    st  = has_filter("stereotools")
+    dyn = has_filter("dynaudnorm")
+    ac  = has_filter("acompressor")
+
+    if st:
+        vocal = "stereotools=mlev=1:slev=0"
+        instr = "stereotools=mlev=0:slev=1"
+    else:
+        # Fallback to pan mid/side approximation
+        vocal = "pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1"
+        instr = "pan=stereo|c0=c0-c1|c1=c1-c0"
+
+    # add tone-shaping + dynamics if available
+    if dyn:
+        vocal += ",highpass=f=120,lowpass=f=9000,dynaudnorm=f=75:s=10"
+        instr += ",highpass=f=60,lowpass=f=16000,dynaudnorm=f=250:s=10"
+    elif ac:
+        vocal += ",highpass=f=120,lowpass=f=9000,acompressor"
+        instr += ",highpass=f=60,lowpass=f=16000"
+    else:
+        vocal += ",highpass=f=120,lowpass=f=9000"
+        instr += ",highpass=f=60,lowpass=f=16000"
+
+    return vocal, instr, {"stereotools": st, "dynaudnorm": dyn, "acompressor": ac}
+
 def side_energy_db(path: str) -> Optional[float]:
-    """Measure Side (S) channel RMS in dB. If very low, track is dual-mono (L≈R)."""
     try:
-        cmd = [
-            "ffmpeg","-v","error","-i",path,
-            "-af","stereotools=mlev=0:slev=1,astats=metadata=1:reset=0:measure_overall=1",
-            "-f","null","-"
-        ]
+        cmd = ["ffmpeg","-v","error","-i",path,"-af",
+               "stereotools=mlev=0:slev=1,astats=metadata=1:reset=0:measure_overall=1",
+               "-f","null","-"]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
         import re
         vals = re.findall(r"Overall RMS level:\s*(-?\d+(?:\.\d+)?)", r.stderr)
         return float(vals[-1]) if vals else None
-    except Exception as e:
-        logging.warning("side_energy_db error: %s", e)
+    except Exception:
         return None
 
-# ---------------- FFmpeg separation ----------------
+# ---------------- separation ----------------
 def separate_ffmpeg(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
-    """Mid/Side split with sanity checks. Good only when vocals are mostly centered."""
-    # 1) must be stereo
     channels = ffprobe_channels(input_path) or 0
     if channels != 2:
         return False, {"reason": "non_stereo", "channels": channels}
 
-    # 2) detect dual-mono (L≈R) — karaoke math cannot work
     s_db = side_energy_db(input_path)
     if s_db is not None and s_db < -35.0:
         return False, {"reason": "dual_mono", "side_rms_db": s_db}
 
+    os.makedirs(output_dir, exist_ok=True)
+    vocal_mp3 = os.path.join(output_dir, "vocals.mp3")
+    instr_mp3 = os.path.join(output_dir, "instrumental.mp3")
+
+    vocal_filter, instr_filter, filt_avail = build_filters()
+
     try:
-        os.makedirs(output_dir, exist_ok=True)
-        vocal_mp3 = os.path.join(output_dir, "vocals.mp3")
-        instr_mp3 = os.path.join(output_dir, "instrumental.mp3")
-
-        # Mid (center) -> vocals-focus
-        vocal_filter = (
-            "stereotools=mlev=1:slev=0,"
-            "highpass=f=120,lowpass=f=9000,"
-            "acompressor"
-        )
-        # Side (L-R) -> karaoke-style instrumental
-        instr_filter = (
-            "stereotools=mlev=0:slev=1,"
-            "highpass=f=60,lowpass=f=16000"
-        )
-
         r1 = subprocess.run(
             ["ffmpeg","-y","-i",input_path,"-af",vocal_filter,"-codec:a","libmp3lame","-qscale:a","2", vocal_mp3],
             capture_output=True, text=True, timeout=240
         )
         if r1.returncode != 0:
-            return False, {"reason": "ffmpeg_error_vocal", "stderr": r1.stderr[-4000:]}
+            return False, {"reason": "ffmpeg_error_vocal", "stderr": r1.stderr[-4000:], "filters": filt_avail}
 
         r2 = subprocess.run(
             ["ffmpeg","-y","-i",input_path,"-af",instr_filter,"-codec:a","libmp3lame","-qscale:a","2", instr_mp3],
             capture_output=True, text=True, timeout=240
         )
         if r2.returncode != 0:
-            return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:]}
+            return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:], "filters": filt_avail}
 
-        # basic sanity
-        in_sz  = os.path.getsize(input_path)
-        v_sz   = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
-        i_sz   = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
+        in_sz = os.path.getsize(input_path)
+        v_sz  = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
+        i_sz  = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
         if v_sz < max(64_000, 0.05 * in_sz) or i_sz < max(64_000, 0.02 * in_sz):
-            return False, {"reason": "weak_separation", "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
+            return False, {"reason": "weak_separation", "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz, "filters": filt_avail}
 
-        return True, {"mode": "ffmpeg", "side_rms_db": s_db, "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
+        return True, {"mode": "ffmpeg", "side_rms_db": s_db, "filters": filt_avail,
+                      "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
     except subprocess.TimeoutExpired:
         return False, {"reason": "timeout"}
     except Exception as e:
@@ -161,7 +174,7 @@ def separate_ffmpeg(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, A
 def separate_audio(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
     return separate_ffmpeg(input_path, output_dir)
 
-# ---------------- Automation (30 min) ----------------
+# ---------------- automation ----------------
 _stop = threading.Event()
 def _loop():
     logging.info("automation loop start interval=%ss", REBUILD_INTERVAL_S)
@@ -171,10 +184,9 @@ def _loop():
             logging.info("automation rebuilt flags=%s", len(flagged))
         except Exception as e:
             logging.error("automation error: %s", e)
-
 threading.Thread(target=_loop, daemon=True).start()
 
-# ---------------- Routes ----------------
+# ---------------- routes ----------------
 @app.route("/health")
 def health():
     return jsonify({
@@ -182,6 +194,11 @@ def health():
         "ffmpeg":  ok(["ffmpeg", "-version"]),
         "ffprobe": ok(["ffprobe", "-version"]),
         "mode": "ffmpeg",
+        "filters": {
+            "stereotools": has_filter("stereotools"),
+            "dynaudnorm": has_filter("dynaudnorm"),
+            "acompressor": has_filter("acompressor"),
+        },
         "automation_interval_sec": REBUILD_INTERVAL_S
     }), 200
 
@@ -217,13 +234,11 @@ def process():
         out_dir = os.path.join(OUTPUT_ROOT,  f"output_{file_id}")
 
         try:
-            if os.path.exists(out_dir):
-                shutil.rmtree(out_dir)
+            if os.path.exists(out_dir): shutil.rmtree(out_dir)
         except Exception:
             pass
         os.makedirs(out_dir, exist_ok=True)
-        with open(in_path, "wb") as w:
-            w.write(blob)
+        with open(in_path, "wb") as w: w.write(blob)
 
         ok_sep, notes = separate_audio(in_path, out_dir)
         if not ok_sep:
@@ -303,7 +318,6 @@ def not_found(_):
 def internal_error(_):
     return jsonify({"status":"error","message":"Internal server error"}), 500
 
-# ---------------- Main ----------------
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
     logging.info("Starting on 0.0.0.0:%s (mode=ffmpeg, interval=%ss)", port, REBUILD_INTERVAL_S)
