@@ -12,17 +12,18 @@ services:
       pip install --upgrade pip
       pip install -r requirements.txt
     startCommand: gunicorn -w 1 -k gthread -t 900 app:app
-    envVars:
-      - key: SPLEETER_BIN
-        value: /opt/render/project/src/spleeter_env/bin/spleeter
-      - key: REBUILD_INTERVAL_SECONDS
-        value: "1800"
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: PYTHON_VERSION
-        value: 3.9.18
-      - key: SEPARATION_MODE
-        value: auto
+   envVars:
+  - key: SPLEETER_BIN
+    value: /opt/render/project/src/spleeter_env/bin/spleeter
+  - key: REBUILD_INTERVAL_SECONDS
+    value: "1800"
+  - key: PYTHONUNBUFFERED
+    value: "1"
+  - key: PYTHON_VERSION
+    value: 3.9.18
+  - key: SEPARATION_MODE
+    value: ffmpeg   
+
     healthCheckPath: /health
     autoDeploy: true
 
