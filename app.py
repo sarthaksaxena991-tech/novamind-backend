@@ -19,7 +19,6 @@ OUTPUT_ROOT   = "static/outputs"
 MAX_FILE_SIZE = 30 * 1024 * 1024  # 30 MB
 ALLOWED_EXT   = {"mp3", "wav"}
 
-# Feedback + automation
 FEEDBACK_FILE      = "learning_data.json"
 BAD_OUTPUTS_FILE   = "outputs_to_improve.json"
 THRESHOLD_NEG      = 2
@@ -86,36 +85,52 @@ def is_problematic_output(output_id: str) -> bool:
     except Exception:
         return False
 
+def side_energy_db(path: str) -> Optional[float]:
+    """Measure Side (S) channel RMS in dB. If very low, track is dual-mono (L≈R)."""
+    try:
+        cmd = [
+            "ffmpeg","-v","error","-i",path,
+            "-af","stereotools=mlev=0:slev=1,astats=metadata=1:reset=0:measure_overall=1",
+            "-f","null","-"
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=40)
+        import re
+        vals = re.findall(r"Overall RMS level:\s*(-?\d+(?:\.\d+)?)", r.stderr)
+        return float(vals[-1]) if vals else None
+    except Exception as e:
+        logging.warning("side_energy_db error: %s", e)
+        return None
+
 # ---------------- FFmpeg separation ----------------
 def separate_ffmpeg(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
-    """
-    Mid/Side trick:
-      - Vocals  ~ mid (L+R)/2 with gentle EQ/normalization
-      - Instr.  ~ side (L-R, R-L) with gentle EQ/normalization
-    """
-    ch = ffprobe_channels(input_path)
-    if ch is None:
-        return False, {"reason": "probe_failed"}
-    if ch < 2:
-        return False, {"reason": "non_stereo", "channels": ch}
+    """Mid/Side split with sanity checks. Good only when vocals are mostly centered."""
+    # 1) must be stereo
+    channels = ffprobe_channels(input_path) or 0
+    if channels != 2:
+        return False, {"reason": "non_stereo", "channels": channels}
 
-    os.makedirs(output_dir, exist_ok=True)
-    vocal_mp3 = os.path.join(output_dir, "vocals.mp3")
-    instr_mp3 = os.path.join(output_dir, "instrumental.mp3")
-
-    # Filters tuned to be conservative and fast
-    vocal_filter = (
-        "pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1,"
-        "highpass=f=120,lowpass=f=7000,"
-        "dynaudnorm=f=75:s=10"
-    )
-    instr_filter = (
-        "pan=stereo|c0=c0-c1|c1=c1-c0,"
-        "highpass=f=40,lowpass=f=16000,"
-        "dynaudnorm=f=250:s=10"
-    )
+    # 2) detect dual-mono (L≈R) — karaoke math cannot work
+    s_db = side_energy_db(input_path)
+    if s_db is not None and s_db < -35.0:
+        return False, {"reason": "dual_mono", "side_rms_db": s_db}
 
     try:
+        os.makedirs(output_dir, exist_ok=True)
+        vocal_mp3 = os.path.join(output_dir, "vocals.mp3")
+        instr_mp3 = os.path.join(output_dir, "instrumental.mp3")
+
+        # Mid (center) -> vocals-focus
+        vocal_filter = (
+            "stereotools=mlev=1:slev=0,"
+            "highpass=f=120,lowpass=f=9000,"
+            "acompressor"
+        )
+        # Side (L-R) -> karaoke-style instrumental
+        instr_filter = (
+            "stereotools=mlev=0:slev=1,"
+            "highpass=f=60,lowpass=f=16000"
+        )
+
         r1 = subprocess.run(
             ["ffmpeg","-y","-i",input_path,"-af",vocal_filter,"-codec:a","libmp3lame","-qscale:a","2", vocal_mp3],
             capture_output=True, text=True, timeout=240
@@ -130,21 +145,20 @@ def separate_ffmpeg(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, A
         if r2.returncode != 0:
             return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:]}
 
-        # Heuristic sanity check
-        in_sz   = os.path.getsize(input_path)
-        voc_sz  = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
-        ins_sz  = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
-        if voc_sz < max(64_000, 0.05 * in_sz) or ins_sz < max(64_000, 0.05 * in_sz):
-            return False, {"reason": "weak_separation", "voc_bytes": voc_sz, "ins_bytes": ins_sz, "in_bytes": in_sz}
+        # basic sanity
+        in_sz  = os.path.getsize(input_path)
+        v_sz   = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
+        i_sz   = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
+        if v_sz < max(64_000, 0.05 * in_sz) or i_sz < max(64_000, 0.02 * in_sz):
+            return False, {"reason": "weak_separation", "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
 
-        return True, {"mode": "ffmpeg", "channels": ch, "voc_bytes": voc_sz, "ins_bytes": ins_sz, "in_bytes": in_sz}
+        return True, {"mode": "ffmpeg", "side_rms_db": s_db, "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
     except subprocess.TimeoutExpired:
         return False, {"reason": "timeout"}
     except Exception as e:
         return False, {"reason": "exception", "error": str(e)}
 
 def separate_audio(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
-    # Force FFmpeg path only
     return separate_ffmpeg(input_path, output_dir)
 
 # ---------------- Automation (30 min) ----------------
@@ -202,7 +216,6 @@ def process():
         in_path = os.path.join(UPLOAD_FOLDER, f"input_{file_id}_{safe}")
         out_dir = os.path.join(OUTPUT_ROOT,  f"output_{file_id}")
 
-        # clean + prep
         try:
             if os.path.exists(out_dir):
                 shutil.rmtree(out_dir)
@@ -218,6 +231,7 @@ def process():
             msg = {
                 "probe_failed": "Could not inspect audio.",
                 "non_stereo": f"Stereo audio required. Channels={notes.get('channels','?')}.",
+                "dual_mono":  "Track is dual-mono (L≈R). Karaoke separation can’t work on this file.",
                 "ffmpeg_error_vocal": "FFmpeg failed while creating vocal track.",
                 "ffmpeg_error_instr": "FFmpeg failed while creating instrumental track.",
                 "weak_separation": "Separation too weak for this file.",
