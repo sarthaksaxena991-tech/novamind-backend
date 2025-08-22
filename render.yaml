@@ -8,10 +8,8 @@ services:
       apt-get update && apt-get install -y ffmpeg
       pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: gunicorn -w 1 -k gthread -t 900 -b 0.0.0.0:$PORT app:app
+    startCommand: gunicorn -w 1 -k gthread -t 900 app:app
     envVars:
-      - key: SEPARATION_MODE
-        value: ffmpeg
       - key: REBUILD_INTERVAL_SECONDS
         value: "1800"
       - key: PYTHONUNBUFFERED
@@ -20,4 +18,5 @@ services:
         value: 3.9.18
     healthCheckPath: /health
     autoDeploy: true
+
 
