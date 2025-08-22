@@ -21,6 +21,9 @@ services:
         value: "1"
       - key: PYTHON_VERSION
         value: 3.9.18
+      - key: SEPARATION_MODE
+        value: auto
     healthCheckPath: /health
     autoDeploy: true
+
 
