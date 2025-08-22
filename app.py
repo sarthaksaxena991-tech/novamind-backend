@@ -74,6 +74,24 @@ def is_problematic_output(output_id: str) -> bool:
     except Exception:
         return False
 
+# ---- encoder detect ----
+_MP3_ENCODER = None
+def mp3_encoder() -> str:
+    global _MP3_ENCODER
+    if _MP3_ENCODER is not None:
+        return _MP3_ENCODER
+    try:
+        r = subprocess.run(["ffmpeg","-hide_banner","-encoders"], capture_output=True, text=True, timeout=20)
+        text = r.stdout
+    except Exception:
+        text = ""
+    # prefer libmp3lame, else native ffmpeg mp3 encoder
+    _MP3_ENCODER = "libmp3lame" if "libmp3lame" in text else "mp3"
+    logging.info("Using MP3 encoder: %s", _MP3_ENCODER)
+    return _MP3_ENCODER
+
+
+
 # ---- FFmpeg filter detection + builders ----
 _FILTER_LIST: Optional[str] = None
 def ff_filters() -> str:
@@ -142,37 +160,35 @@ def separate_ffmpeg(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, A
     instr_mp3 = os.path.join(output_dir, "instrumental.mp3")
 
     vocal_filter, instr_filter, filt_avail = build_filters()
+try:
+    enc = mp3_encoder()  # libmp3lame available ho to use, warna built-in mp3
 
-    try:
-        r1 = subprocess.run(
-            ["ffmpeg","-y","-i",input_path,"-af",vocal_filter,"-codec:a","libmp3lame","-qscale:a","2", vocal_mp3],
-            capture_output=True, text=True, timeout=240
-        )
-        if r1.returncode != 0:
-            return False, {"reason": "ffmpeg_error_vocal", "stderr": r1.stderr[-4000:], "filters": filt_avail}
+    r1 = subprocess.run(
+        ["ffmpeg","-y","-i",input_path,"-af",vocal_filter,"-c:a",enc,"-qscale:a","2",vocal_mp3],
+        capture_output=True, text=True, timeout=240
+    )
+    if r1.returncode != 0:
+        return False, {"reason": "ffmpeg_error_vocal", "stderr": r1.stderr[-4000:], "filters": filt_avail}
 
-        r2 = subprocess.run(
-            ["ffmpeg","-y","-i",input_path,"-af",instr_filter,"-codec:a","libmp3lame","-qscale:a","2", instr_mp3],
-            capture_output=True, text=True, timeout=240
-        )
-        if r2.returncode != 0:
-            return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:], "filters": filt_avail}
+    r2 = subprocess.run(
+        ["ffmpeg","-y","-i",input_path,"-af",instr_filter,"-c:a",enc,"-qscale:a","2",instr_mp3],
+        capture_output=True, text=True, timeout=240
+    )
+    if r2.returncode != 0:
+        return False, {"reason": "ffmpeg_error_instr", "stderr": r2.stderr[-4000:], "filters": filt_avail}
 
-        in_sz = os.path.getsize(input_path)
-        v_sz  = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
-        i_sz  = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
-        if v_sz < max(64_000, 0.05 * in_sz) or i_sz < max(64_000, 0.02 * in_sz):
-            return False, {"reason": "weak_separation", "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz, "filters": filt_avail}
+    in_sz = os.path.getsize(input_path)
+    v_sz  = os.path.getsize(vocal_mp3) if os.path.exists(vocal_mp3) else 0
+    i_sz  = os.path.getsize(instr_mp3) if os.path.exists(instr_mp3) else 0
+    if v_sz < max(64_000, 0.05 * in_sz) or i_sz < max(64_000, 0.02 * in_sz):
+        return False, {"reason": "weak_separation", "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz, "filters": filt_avail}
 
-        return True, {"mode": "ffmpeg", "side_rms_db": s_db, "filters": filt_avail,
-                      "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
-    except subprocess.TimeoutExpired:
-        return False, {"reason": "timeout"}
-    except Exception as e:
-        return False, {"reason": "exception", "error": str(e)}
-
-def separate_audio(input_path: str, output_dir: str) -> Tuple[bool, Dict[str, Any]]:
-    return separate_ffmpeg(input_path, output_dir)
+    return True, {"mode": "ffmpeg", "side_rms_db": s_db, "filters": filt_avail,
+                  "v_bytes": v_sz, "i_bytes": i_sz, "in_bytes": in_sz}
+except subprocess.TimeoutExpired:
+    return False, {"reason": "timeout"}
+except Exception as e:
+    return False, {"reason": "exception", "error": str(e)}
 
 # ---------------- automation ----------------
 _stop = threading.Event()
